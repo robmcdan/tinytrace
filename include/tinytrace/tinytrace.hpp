@@ -41,11 +41,15 @@ public:
     uint64_t current_span_id() const { return current_span_id_; }
 
     void push_span(uint64_t span_id) {
-        
+        span_stack_.push_back(span_id);
+        current_span_id_ = span_id;
     }
 
     void pop_span() {
-      
+        if (!span_stack_.empty()) {
+            span_stack_.pop_back();
+            current_span_id_ = span_stack_.empty() ? 0 : span_stack_.back();
+        }
     }
 
 private:
@@ -66,15 +70,27 @@ public:
     }
 
     void set_output_file(const std::string& path) {
-       
+        std::lock_guard<std::mutex> lock(mutex_);
+        file_output_ = std::make_unique<std::ofstream>(path, std::ios::app);
+        use_file_ = file_output_ && file_output_->is_open();
     }
 
     void write_span(const std::string& json) {
-       
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (use_file_ && file_output_) {
+            (*file_output_) << json << std::endl;
+        } else {
+            std::cout << json << std::endl;
+        }
     }
 
     void flush() {
-       
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (use_file_ && file_output_) {
+            file_output_->flush();
+        } else {
+            std::cout.flush();
+        }
     }
 
 private:
@@ -121,7 +137,14 @@ private:
     }
 
     void emit_span(duration_us duration) {
-      
+        std::ostringstream json;
+        json << R"({"name":")" << data_.name << R"(",)"
+             << R"("span_id":)" << data_.span_id << ","
+             << R"("parent_id":)" << data_.parent_id << ","
+             << R"("duration_us":)" << duration.count() << ","
+             << R"("thread_id":")" << data_.thread_id << R"("})";
+
+        TraceBackend::instance().write_span(json.str());
     }
 
     SpanData data_;
