@@ -1,0 +1,5 @@
+add_executable(simple_example simple_example.cpp)
+target_link_libraries(simple_example PRIVATE tinytrace)
+
+add_executable(cache_rpc_example cache_rpc_example.cpp)
+target_link_libraries(cache_rpc_example PRIVATE tinytrace)
